@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/k3s-io/kine/pkg/drivers/dqlite"
 	"github.com/k3s-io/kine/pkg/drivers/generic"
@@ -20,21 +21,23 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/soheilhy/cmux"
-	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 )
 
 const (
-	KineSocket       = "unix://kine.sock"
-	SQLiteBackend    = "sqlite"
-	DQLiteBackend    = "dqlite"
-	ETCDBackend      = "etcd3"
-	JetStreamBackend = "jetstream"
-	NATSBackend      = "nats"
-	MySQLBackend     = "mysql"
-	PostgresBackend  = "postgres"
+	KineSocket                   = "unix://kine.sock"
+	SQLiteBackend                = "sqlite"
+	DQLiteBackend                = "dqlite"
+	ETCDBackend                  = "etcd3"
+	JetStreamBackend             = "jetstream"
+	NATSBackend                  = "nats"
+	MySQLBackend                 = "mysql"
+	PostgresBackend              = "postgres"
+	DefaultGRPCKeepAliveMinTime  = 5 * time.Second
+	DefaultGRPCKeepAliveInterval = 2 * time.Hour
+	DefaultGRPCKeepAliveTimeout  = 20 * time.Second
 )
 
 type Config struct {
@@ -208,12 +211,12 @@ func grpcServer(config Config) (*grpc.Server, error) {
 
 	gopts := []grpc.ServerOption{
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			MinTime:             embed.DefaultGRPCKeepAliveMinTime,
+			MinTime:             DefaultGRPCKeepAliveMinTime,
 			PermitWithoutStream: false,
 		}),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Time:    embed.DefaultGRPCKeepAliveInterval,
-			Timeout: embed.DefaultGRPCKeepAliveTimeout,
+			Time:    DefaultGRPCKeepAliveInterval,
+			Timeout: DefaultGRPCKeepAliveTimeout,
 		}),
 	}
 

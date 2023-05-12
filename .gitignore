@@ -59,12 +59,10 @@ network_closure.sh
 /bazel-*
 *.pyc
 
-# Go vendor files
-vendor/
-
 # kine database file
 db/
 
 # build artifacts
 bin/
 dist/
+kine
