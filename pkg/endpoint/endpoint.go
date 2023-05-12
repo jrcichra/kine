@@ -8,17 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k3s-io/kine/pkg/drivers/dqlite"
 	"github.com/k3s-io/kine/pkg/drivers/generic"
-	"github.com/k3s-io/kine/pkg/drivers/mysql"
-	"github.com/k3s-io/kine/pkg/drivers/nats"
-	"github.com/k3s-io/kine/pkg/drivers/pgsql"
 	"github.com/k3s-io/kine/pkg/drivers/sqlite"
-	"github.com/k3s-io/kine/pkg/metrics"
 	"github.com/k3s-io/kine/pkg/server"
 	"github.com/k3s-io/kine/pkg/tls"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
@@ -47,7 +41,6 @@ type Config struct {
 	ConnectionPoolConfig generic.ConnectionPoolConfig
 	ServerTLSConfig      tls.Config
 	BackendTLSConfig     tls.Config
-	MetricsRegisterer    prometheus.Registerer
 }
 
 type ETCDConfig struct {
@@ -69,14 +62,6 @@ func Listen(ctx context.Context, config Config) (ETCDConfig, error) {
 	leaderelect, backend, err := getKineStorageBackend(ctx, driver, dsn, config)
 	if err != nil {
 		return ETCDConfig{}, errors.Wrap(err, "building kine")
-	}
-
-	if config.MetricsRegisterer != nil {
-		config.MetricsRegisterer.MustRegister(
-			metrics.SQLTotal,
-			metrics.SQLTime,
-			metrics.CompactTotal,
-		)
 	}
 
 	if err := backend.Start(ctx); err != nil {
@@ -243,17 +228,7 @@ func getKineStorageBackend(ctx context.Context, driver, dsn string, cfg Config) 
 	switch driver {
 	case SQLiteBackend:
 		leaderElect = false
-		backend, err = sqlite.New(ctx, dsn, cfg.ConnectionPoolConfig, cfg.MetricsRegisterer)
-	case DQLiteBackend:
-		backend, err = dqlite.New(ctx, dsn, cfg.ConnectionPoolConfig, cfg.MetricsRegisterer)
-	case PostgresBackend:
-		backend, err = pgsql.New(ctx, dsn, cfg.BackendTLSConfig, cfg.ConnectionPoolConfig, cfg.MetricsRegisterer)
-	case MySQLBackend:
-		backend, err = mysql.New(ctx, dsn, cfg.BackendTLSConfig, cfg.ConnectionPoolConfig, cfg.MetricsRegisterer)
-	case JetStreamBackend:
-		backend, err = nats.NewLegacy(ctx, dsn, cfg.BackendTLSConfig)
-	case NATSBackend:
-		backend, err = nats.New(ctx, dsn, cfg.BackendTLSConfig)
+		backend, err = sqlite.New(ctx, dsn, cfg.ConnectionPoolConfig)
 	default:
 		return false, nil, fmt.Errorf("storage backend is not defined")
 	}

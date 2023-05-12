@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/k3s-io/kine/pkg/endpoint"
-	"github.com/k3s-io/kine/pkg/metrics"
 	"github.com/k3s-io/kine/pkg/version"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -16,8 +14,7 @@ import (
 )
 
 var (
-	config        endpoint.Config
-	metricsConfig metrics.Config
+	config endpoint.Config
 )
 
 func main() {
@@ -79,23 +76,6 @@ func main() {
 			Usage:       "Key file for DB connection",
 			Destination: &config.BackendTLSConfig.KeyFile,
 		},
-		cli.StringFlag{
-			Name:        "metrics-bind-address",
-			Usage:       "The address the metric endpoint binds to. Default :8080, set 0 to disable metrics serving.",
-			Destination: &metricsConfig.ServerAddress,
-			Value:       ":8080",
-		},
-		cli.DurationFlag{
-			Name:        "slow-sql-threshold",
-			Usage:       "The duration which SQL executed longer than will be logged. Default 1s, set <= 0 to disable slow SQL log.",
-			Destination: &metrics.SlowSQLThreshold,
-			Value:       time.Second,
-		},
-		cli.BoolFlag{
-			Name:        "metrics-enable-profiling",
-			Usage:       "Enable net/http/pprof handlers on the metrics bind address. Default is false.",
-			Destination: &metricsConfig.EnableProfiling,
-		},
 		cli.BoolFlag{Name: "debug"},
 	}
 	app.Action = run
@@ -112,9 +92,6 @@ func run(c *cli.Context) error {
 		logrus.SetLevel(logrus.TraceLevel)
 	}
 	ctx := signals.SetupSignalHandler(context.Background())
-	metricsConfig.ServerTLSConfig = config.ServerTLSConfig
-	go metrics.Serve(ctx, metricsConfig)
-	config.MetricsRegisterer = metrics.Registry
 	_, err := endpoint.Listen(ctx, config)
 	if err != nil {
 		return err

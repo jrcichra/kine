@@ -13,11 +13,8 @@ import (
 
 	"github.com/Rican7/retry/backoff"
 	"github.com/Rican7/retry/strategy"
-	"github.com/k3s-io/kine/pkg/metrics"
 	"github.com/k3s-io/kine/pkg/server"
 	"github.com/k3s-io/kine/pkg/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -178,7 +175,7 @@ func openAndTest(driverName, dataSourceName string) (*sql.DB, error) {
 	return db, nil
 }
 
-func Open(ctx context.Context, driverName, dataSourceName string, connPoolConfig ConnectionPoolConfig, paramCharacter string, numbered bool, metricsRegisterer prometheus.Registerer) (*Generic, error) {
+func Open(ctx context.Context, driverName, dataSourceName string, connPoolConfig ConnectionPoolConfig, paramCharacter string, numbered bool) (*Generic, error) {
 	var (
 		db  *sql.DB
 		err error
@@ -199,10 +196,6 @@ func Open(ctx context.Context, driverName, dataSourceName string, connPoolConfig
 	}
 
 	configureConnectionPooling(connPoolConfig, db, driverName)
-
-	if metricsRegisterer != nil {
-		metricsRegisterer.MustRegister(collectors.NewDBStatsCollector(db, "kine"))
-	}
 
 	return &Generic{
 		DB: db,
@@ -253,19 +246,11 @@ func Open(ctx context.Context, driverName, dataSourceName string, connPoolConfig
 
 func (d *Generic) query(ctx context.Context, sql string, args ...interface{}) (result *sql.Rows, err error) {
 	logrus.Tracef("QUERY %v : %s", args, util.Stripped(sql))
-	startTime := time.Now()
-	defer func() {
-		metrics.ObserveSQL(startTime, d.ErrCode(err), util.Stripped(sql), args)
-	}()
 	return d.DB.QueryContext(ctx, sql, args...)
 }
 
 func (d *Generic) queryRow(ctx context.Context, sql string, args ...interface{}) (result *sql.Row) {
 	logrus.Tracef("QUERY ROW %v : %s", args, util.Stripped(sql))
-	startTime := time.Now()
-	defer func() {
-		metrics.ObserveSQL(startTime, d.ErrCode(result.Err()), util.Stripped(sql), args)
-	}()
 	return d.DB.QueryRowContext(ctx, sql, args...)
 }
 
@@ -278,9 +263,7 @@ func (d *Generic) execute(ctx context.Context, sql string, args ...interface{}) 
 	wait := strategy.Backoff(backoff.Linear(100 + time.Millisecond))
 	for i := uint(0); i < 20; i++ {
 		logrus.Tracef("EXEC (try: %d) %v : %s", i, args, util.Stripped(sql))
-		startTime := time.Now()
 		result, err = d.DB.ExecContext(ctx, sql, args...)
-		metrics.ObserveSQL(startTime, d.ErrCode(err), util.Stripped(sql), args)
 		if err != nil && d.Retry != nil && d.Retry(err) {
 			wait(i)
 			continue
